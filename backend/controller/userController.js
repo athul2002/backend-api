@@ -25,7 +25,8 @@ exports.registerUser=asyncError(async(req,res,next)=>{
 })
 exports.availableSessions=asyncError(async(req,res)=>{
     const sessions=await Session.find({
-      startTime:{$gte:Date.now()}
+      startTime:{$gte:Date.now()},
+      status:"free"
     });
     if(!sessions || sessions.length===0)
     {
@@ -69,6 +70,7 @@ exports.bookSession=asyncError(async(req,res,next)=>{
         deanId:req.body.deanId,
         startTime:req.body.startTime,
         endTime:req.body.endTime,
+        status:"free"
     });
 
     if(!sessions)
@@ -80,23 +82,14 @@ exports.bookSession=asyncError(async(req,res,next)=>{
 
     }
     else
-{    const {deanId,startTime,endTime}=req.body;
+{    
+      const {deanId,startTime,endTime}=req.body;
       const {userId,userName}=req.user;
       const deanName=sessions.deanName;
-
-    var arr= [{Id:userId,startTime:startTime,endTime:endTime,Name:userName}]
-    var arrDean= [{startTime:startTime,endTime:endTime,Name:deanName,Id:deanId}]
-
-    await User.findOneAndUpdate(
-      {userId:userId},{$push:{Sessions: arrDean }}
-    )
-    await User.findOneAndUpdate(
-      {userId:deanId},{$push:{Sessions: arr }}
-    )
-    await sessions.deleteOne();
+    await Session.findOneAndUpdate({deanId:deanId,startTime:startTime},{userId:userId,userName:userName,status:"booked"}),
     res.status(200).json({success:true,
         message:"Your booking is successful",
-      });} 
+      });}  
 })
 exports.createSession=asyncError(async(req,res,next)=>{
 
@@ -129,89 +122,94 @@ exports.createSession=asyncError(async(req,res,next)=>{
     }
 })
 
+
 exports.mySessions=asyncError(async(req,res)=>{
+
     if(req.user)
     {
-        const user=await User.find({
-        userId:req.user.userId,      
-    })
-    let appoint=[]
-    if(user)
-    {
-       const appointments=user[0].Sessions;
-       for(let i=0;i<appointments.length;i++)
-       {
-         if(appointments[i].startTime>Date.now())
-         {
-           var localStartTime = new Date(appointments[i].startTime.getTime() - appointments[i].startTime.getTimezoneOffset()*60*1000);
-           var localEndTime = new Date(appointments[i].endTime.getTime() - appointments[i].endTime.getTimezoneOffset()*60*1000);
-           var date1=localStartTime.toISOString();
-           var date2=localEndTime.toISOString();
-           var frmTime=(date1.split('T')[1]).split('.')[0]
-           var toTime=(date2.split('T')[1]).split('.')[0]
-           var date=(date2.split('T')[0])
-           var y=(date.split('-'))[0]
-           var m=(date.split('-'))[1]
-           var d=(date.split('-'))[2]
-           let msg={"Dean Id":appointments[i].Id,"Dean Name":appointments[i].Name,"Date":`${d}-${m}-${y}`,"Time":`${frmTime}-${toTime}`}
-           appoint.push(msg)
-         }
-       }
-       if(appoint.length===0)
-       {
-         res.status(200).json({
-           success:true,
-           message:"You dont have any active appointments"
-           })
-       }
-       else
-{              res.status(200).json({
-         success:true,
-         message:appoint
-         })}
-    }
-    }
-    else
-    {
-          const user=await User.find({
-          userId:req.dean.userId,
+      const sessions=await Session.find({
+        userId:req.user.userId,
+        startTime:{$gte:Date.now()}
+      })
+      if(!sessions)
+      {
+        res.status(200).json({
+          message:"You dont have any active appointments"
         })
-        let appoint=[]
-           if(user)
-           {
-              const appointments=user[0].Sessions;
-              for(let i=0;i<appointments.length;i++)
-              {
-                if(appointments[i].startTime>Date.now())
-                {
-                  var localStartTime = new Date(appointments[i].startTime.getTime() - appointments[i].startTime.getTimezoneOffset()*60*1000);
-                  var localEndTime = new Date(appointments[i].endTime.getTime() - appointments[i].endTime.getTimezoneOffset()*60*1000);
-                  var date1=localStartTime.toISOString();
-                  var date2=localEndTime.toISOString();
-                  var frmTime=(date1.split('T')[1]).split('.')[0]
-                  var toTime=(date2.split('T')[1]).split('.')[0]
-                  var date=(date2.split('T')[0])
-                  var y=(date.split('-'))[0]
-                  var m=(date.split('-'))[1]
-                  var d=(date.split('-'))[2]
-                  let msg={"User Id":appointments[i].Id,"User Name":appointments[i].Name,"Date":`${d}-${m}-${y}`,"Time":`${frmTime}-${toTime}`}
-                  appoint.push(msg)
-                }
-              }
-            
-              if(appoint.length===0)
-              {
-                res.status(200).json({
-                  success:true,
-                  message:"You dont have any active appointments"
-                  })
-              }
-              else
-{              res.status(200).json({
-                success:true,
-                message:appoint
-                })}
-           }
-      
+      }
+      else{
+        let appoint=[];
+        for(let i=0;i<sessions.length;i++)
+        {
+          var localStartTime = new Date(sessions[i].startTime.getTime() - sessions[i].startTime.getTimezoneOffset()*60*1000);
+          var localEndTime = new Date(sessions[i].endTime.getTime() - sessions[i].endTime.getTimezoneOffset()*60*1000);
+          var date1=localStartTime.toISOString();
+          var date2=localEndTime.toISOString();
+          var frmTime=(date1.split('T')[1]).split('.')[0]
+          var toTime=(date2.split('T')[1]).split('.')[0]
+          var date=(date2.split('T')[0])
+          var y=(date.split('-'))[0]
+          var m=(date.split('-'))[1]
+          var d=(date.split('-'))[2]
+          let msg={"Dean Id":sessions[i].deanId,"Dean Name":sessions[i].deanName,"Date":`${d}-${m}-${y}`,"Time":`${frmTime}-${toTime}`}
+          appoint.push(msg)
+        }
+        if(appoint.length==0)
+        {   
+        res.status(400).json({
+          success:false,
+          message:"You dont have any active appointments"
+        })
+        }
+        else
+{        res.status(200).json({
+          appoint
+        })}
+      }
+    }
+    else if(req.dean)
+    {
+      // console.log(user)
+      const sessions=await Session.find({
+        startTime:{$gte:Date.now()},
+        deanId:req.dean.userId
+      })
+      if(!sessions)
+      {
+        res.status(200).json({
+          message:"You dont have any active appointments"
+        })
+      }
+      else{
+        let appoint=[];
+        for(let i=0;i<sessions.length;i++)
+        {
+          if(sessions[i].userId)
+          {
+          var localStartTime = new Date(sessions[i].startTime.getTime() - sessions[i].startTime.getTimezoneOffset()*60*1000);
+          var localEndTime = new Date(sessions[i].endTime.getTime() - sessions[i].endTime.getTimezoneOffset()*60*1000);
+          var date1=localStartTime.toISOString();
+          var date2=localEndTime.toISOString();
+          var frmTime=(date1.split('T')[1]).split('.')[0]
+          var toTime=(date2.split('T')[1]).split('.')[0]
+          var date=(date2.split('T')[0])
+          var y=(date.split('-'))[0]
+          var m=(date.split('-'))[1]
+          var d=(date.split('-'))[2]
+          let msg={"User Id":sessions[i].userId,"User Name":sessions[i].userName,"Date":`${d}-${m}-${y}`,"Time":`${frmTime}-${toTime}`}
+          appoint.push(msg)}
+        }
+        if(appoint.length==0)
+        {   
+        res.status(400).json({
+          success:false,
+          message:"You dont have any active appointments"
+        })
+        }
+        else
+{        res.status(200).json({
+          appoint
+        })}
+      }
     }
 })
