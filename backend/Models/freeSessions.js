@@ -17,6 +17,16 @@ const sessionSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    userId:{
+      type:String,
+    },
+    userName:{
+      type:String,
+    },
+    status:{
+      type:String,
+      default:"free"
+    }
   },
   {
     timestamps: true,
