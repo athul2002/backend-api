@@ -22,7 +22,6 @@ const userSchema=new mongoose.Schema({
         type:String,
         default:"user",
     },
-    Sessions: [{Id:{type:String},startTime:{type:Date},endTime:{type:Date},Name:{type:String}}], 
 }, 
  
 {
